@@ -1,21 +1,21 @@
-const products = [
-  { id: 'p1', name: '상품1', price: 10000, quantity: 50 },
-  { id: 'p2', name: '상품2', price: 20000, quantity: 30 },
-  { id: 'p3', name: '상품3', price: 30000, quantity: 20 },
-  { id: 'p4', name: '상품4', price: 15000, quantity: 0 },
-  { id: 'p5', name: '상품5', price: 25000, quantity: 10 },
-];
+import { getState, dispatch } from './store';
 
 let ProductSelectOptions, AddToCartButton, Cart, CartTotalSummary, StockStatus;
 
-// 전역 스토어로 관리
-let lastSelectedProductId,
-  totalAmount = 0;
+const createElement = (tagName, options) => {
+  const element = document.createElement(tagName);
+
+  if (options.className) element.className = options.className;
+  if (options.textContent) element.textContent = options.textContent;
+
+  return element;
+};
 
 const main = () => {
-  let hTxt = document.createElement('h1');
-  hTxt.className = 'text-2xl font-bold mb-4';
-  hTxt.textContent = '장바구니';
+  const $cartText = createElement('h1', {
+    className: 'text-2xl font-bold mb-4',
+    textContent: '장바구니',
+  });
 
   Cart = document.createElement('div');
   Cart.id = 'cart-items';
@@ -37,28 +37,29 @@ const main = () => {
   StockStatus.id = 'stock-status';
   StockStatus.className = 'text-sm text-gray-500 mt-2';
 
-  const wrap = document.createElement('div');
-  wrap.className =
+  const wrapper = document.createElement('div');
+  wrapper.className =
     'max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden md:max-w-2xl p-8';
-  wrap.appendChild(hTxt);
-  wrap.appendChild(Cart);
-  wrap.appendChild(CartTotalSummary);
-  wrap.appendChild(ProductSelectOptions);
-  wrap.appendChild(AddToCartButton);
-  wrap.appendChild(StockStatus);
+  wrapper.appendChild($cartText);
+  wrapper.appendChild(Cart);
+  wrapper.appendChild(CartTotalSummary);
+  wrapper.appendChild(ProductSelectOptions);
+  wrapper.appendChild(AddToCartButton);
+  wrapper.appendChild(StockStatus);
 
-  let cont = document.createElement('div');
-  cont.className = 'bg-gray-100 p-8';
-  cont.appendChild(wrap);
+  let content = document.createElement('div');
+  content.className = 'bg-gray-100 p-8';
+  content.appendChild(wrapper);
 
   const root = document.getElementById('app');
-  root.appendChild(cont);
+  root.appendChild(content);
 
   updateSelectOptions();
   updateCartTotals();
 
   setTimeout(() => {
     setInterval(() => {
+      const products = getState('products');
       const luckyItem = products[Math.floor(Math.random() * products.length)];
 
       if (Math.random() < 0.3 && luckyItem.quantity > 0) {
@@ -71,7 +72,9 @@ const main = () => {
 
   setTimeout(() => {
     setInterval(() => {
+      const lastSelectedProductId = getState('lastSelectedProductId');
       if (lastSelectedProductId) {
+        const products = getState('products');
         const suggestItem = products.find((item) => {
           return item.id !== lastSelectedProductId && item.quantity > 0;
         });
@@ -92,6 +95,7 @@ const main = () => {
 const updateSelectOptions = () => {
   ProductSelectOptions.innerHTML = '';
 
+  const products = getState('products');
   products.forEach((product) => {
     const selectOption = document.createElement('option');
     selectOption.value = product.id;
@@ -107,9 +111,10 @@ const updateCartTotals = () => {
   const cartItems = Cart.children;
   let totalQuantity = 0;
   let totalAmountWithoutDiscount = 0;
-  totalAmount = 0;
+  let calculatedTotalAmount = 0;
 
   for (let i = 0; i < cartItems.length; i++) {
+    const products = getState('products');
     const itemInfo = products.find((product) => product.id === cartItems[i].id);
     const itemQuantity = parseInt(
       cartItems[i].querySelector('span').textContent.split('x ')[1]
@@ -141,30 +146,34 @@ const updateCartTotals = () => {
       itemInfo.id,
       itemQuantity
     );
-    totalAmount += itemTotalAmount * (1 - itemDiscountRate);
+    calculatedTotalAmount += itemTotalAmount * (1 - itemDiscountRate);
   }
 
-  const itemBasedDiscountAmount = totalAmountWithoutDiscount - totalAmount;
+  const itemBasedDiscountAmount =
+    totalAmountWithoutDiscount - calculatedTotalAmount;
   let discountRate = itemBasedDiscountAmount / totalAmountWithoutDiscount;
   // 상수 분리
   const MIN_QUANTITY_FOR_BULK_DISCOUNT = 30;
   if (totalQuantity >= MIN_QUANTITY_FOR_BULK_DISCOUNT) {
     // 상수 분리
     const BULK_DISCOUNT_RATE = 0.25;
-    const additionalBulkDiscountAmount = totalAmount * BULK_DISCOUNT_RATE;
+    const additionalBulkDiscountAmount =
+      calculatedTotalAmount * BULK_DISCOUNT_RATE;
 
     if (additionalBulkDiscountAmount > itemBasedDiscountAmount) {
-      totalAmount = totalAmountWithoutDiscount * (1 - BULK_DISCOUNT_RATE);
+      calculatedTotalAmount =
+        totalAmountWithoutDiscount * (1 - BULK_DISCOUNT_RATE);
       discountRate = BULK_DISCOUNT_RATE;
     }
   }
 
   if (new Date().getDay() === 2) {
-    totalAmount *= 1 - 0.1;
+    calculatedTotalAmount *= 1 - 0.1;
     discountRate = Math.max(discountRate, 0.1);
   }
 
-  CartTotalSummary.textContent = '총액: ' + Math.round(totalAmount) + '원';
+  CartTotalSummary.textContent =
+    '총액: ' + Math.round(calculatedTotalAmount) + '원';
 
   if (discountRate > 0) {
     const span = document.createElement('span');
@@ -173,12 +182,14 @@ const updateCartTotals = () => {
     CartTotalSummary.appendChild(span);
   }
 
+  dispatch('updateTotalAmount', calculatedTotalAmount);
   updateStockStatus();
   renderPoints();
 };
 
 // updateCartTotals 에서 호출
 const renderPoints = () => {
+  const totalAmount = getState('totalAmount');
   const points = Math.floor(totalAmount / 1000);
 
   let ptsTag = document.getElementById('loyalty-points');
@@ -193,6 +204,7 @@ const renderPoints = () => {
 
 // updateCartTotals 에서 호출
 const updateStockStatus = () => {
+  const products = getState('products');
   const stockStatusMessage = products
     .filter((product) => product.quantity < 5)
     .map(
@@ -212,6 +224,7 @@ main();
 
 AddToCartButton.addEventListener('click', () => {
   const selectedProductId = ProductSelectOptions.value;
+  const products = getState('products');
   const productToAdd = products.find((product) => {
     return product.id === selectedProductId;
   });
@@ -258,7 +271,7 @@ AddToCartButton.addEventListener('click', () => {
     }
 
     updateCartTotals();
-    lastSelectedProductId = selectedProductId;
+    dispatch('updateLastSelectedProductId', selectedProductId);
   }
 });
 
@@ -270,6 +283,7 @@ Cart.addEventListener('click', (event) => {
   if (!isChangeQuantity && !isRemove) return;
 
   const productId = target.dataset.productId;
+  const products = getState('products');
   const targetProduct = products.find((product) => {
     return product.id === productId;
   });
