@@ -1,4 +1,12 @@
-import { ELEMENT_ID } from '../consts';
+import {
+  PRODUCT_DISCOUNT_RATES,
+  ELEMENT_ID,
+  DAYS_OF_WEEK,
+  TUESDAY_DISCOUNT_RATE,
+  MIN_QUANTITY_FOR_ITEM_DISCOUNT,
+  MIN_QUANTITY_FOR_BULK_DISCOUNT,
+  BULK_DISCOUNT_RATE,
+} from '../consts';
 import { dispatch, getState } from '../store';
 
 const renderPoints = () => {
@@ -15,6 +23,14 @@ const renderPoints = () => {
       .appendChild(pointsTag);
   }
   pointsTag.textContent = '(포인트: ' + points + ')';
+};
+
+const calculateItemDiscountRate = (productId, quantity) => {
+  if (quantity >= MIN_QUANTITY_FOR_ITEM_DISCOUNT) {
+    return PRODUCT_DISCOUNT_RATES[productId] ?? 0;
+  }
+
+  return 0;
 };
 
 const updateStockStatus = () => {
@@ -36,7 +52,7 @@ const updateStockStatus = () => {
 };
 
 export const updateCartTotals = () => {
-  const cartItems = document.getElementById('cart-items').children;
+  const cartItems = document.getElementById(ELEMENT_ID.CART).children;
   let totalQuantity = 0;
   let totalAmountWithoutDiscount = 0;
   let calculatedTotalAmount = 0;
@@ -52,24 +68,6 @@ export const updateCartTotals = () => {
     totalQuantity += itemQuantity;
     totalAmountWithoutDiscount += itemTotalAmount;
 
-    const PRODUCT_DISCOUNT_RATES = {
-      p1: 0.1,
-      p2: 0.15,
-      p3: 0.2,
-      p4: 0.05,
-      p5: 0.25,
-    };
-    // 유틸 함수 분리
-    const calculateItemDiscountRate = (productId, quantity) => {
-      // 상수 분리
-      const MIN_QUANTITY_FOR_ITEM_DISCOUNT = 10;
-
-      if (quantity >= MIN_QUANTITY_FOR_ITEM_DISCOUNT) {
-        return PRODUCT_DISCOUNT_RATES[productId] ?? 0;
-      }
-
-      return 0;
-    };
     const itemDiscountRate = calculateItemDiscountRate(
       itemInfo.id,
       itemQuantity
@@ -80,11 +78,7 @@ export const updateCartTotals = () => {
   const itemBasedDiscountAmount =
     totalAmountWithoutDiscount - calculatedTotalAmount;
   let discountRate = itemBasedDiscountAmount / totalAmountWithoutDiscount;
-  // 상수 분리
-  const MIN_QUANTITY_FOR_BULK_DISCOUNT = 30;
   if (totalQuantity >= MIN_QUANTITY_FOR_BULK_DISCOUNT) {
-    // 상수 분리
-    const BULK_DISCOUNT_RATE = 0.25;
     const additionalBulkDiscountAmount =
       calculatedTotalAmount * BULK_DISCOUNT_RATE;
 
@@ -95,9 +89,9 @@ export const updateCartTotals = () => {
     }
   }
 
-  if (new Date().getDay() === 2) {
-    calculatedTotalAmount *= 1 - 0.1;
-    discountRate = Math.max(discountRate, 0.1);
+  if (new Date().getDay() === DAYS_OF_WEEK.TUESDAY) {
+    calculatedTotalAmount *= 1 - TUESDAY_DISCOUNT_RATE;
+    discountRate = Math.max(discountRate, TUESDAY_DISCOUNT_RATE);
   }
 
   document.getElementById(ELEMENT_ID.CART_TOTAL_SUMMARY).textContent =

@@ -1,8 +1,12 @@
 import { ELEMENT_ID } from './consts';
 import { addToCartClickHandler, cartClickHandler } from './handler';
 import { createElement } from './lib';
-import { updateCartTotals, updateProductSelect } from './model';
-import { getState } from './store';
+import {
+  updateCartTotals,
+  updateProductSelect,
+  startFlashSalePromotion,
+  startProductRecommendationPromotion,
+} from './model';
 
 const main = () => {
   const $cartText = createElement('h1', {
@@ -58,38 +62,8 @@ const main = () => {
   updateProductSelect();
   updateCartTotals();
 
-  setTimeout(() => {
-    setInterval(() => {
-      const products = getState('products');
-      const luckyItem = products[Math.floor(Math.random() * products.length)];
-
-      if (Math.random() < 0.3 && luckyItem.quantity > 0) {
-        luckyItem.price = Math.round(luckyItem.price * 0.8);
-        alert('번개세일! ' + luckyItem.name + '이(가) 20% 할인 중입니다!');
-        updateSelectOptions();
-      }
-    }, 30000);
-  }, Math.random() * 10000);
-
-  setTimeout(() => {
-    setInterval(() => {
-      const lastSelectedProductId = getState('lastSelectedProductId');
-      if (lastSelectedProductId) {
-        const products = getState('products');
-        const suggestItem = products.find((item) => {
-          return item.id !== lastSelectedProductId && item.quantity > 0;
-        });
-
-        if (suggestItem) {
-          alert(
-            suggestItem.name + '은(는) 어떠세요? 지금 구매하시면 5% 추가 할인!'
-          );
-          suggestItem.price = Math.round(suggestItem.price * 0.95);
-          updateSelectOptions();
-        }
-      }
-    }, 60000);
-  }, Math.random() * 20000);
+  startFlashSalePromotion(updateProductSelect);
+  startProductRecommendationPromotion(updateProductSelect);
 };
 
 main();
