@@ -8,21 +8,28 @@ import {
   BULK_DISCOUNT_RATE,
 } from '../consts';
 import { dispatch, getState } from '../store';
+import { createElement } from '../lib';
 
 const renderPoints = () => {
   const totalAmount = getState('totalAmount');
   const points = Math.floor(totalAmount / 1000);
+  const pointsText = '(포인트: ' + points + ')';
 
-  let pointsTag = document.getElementById('loyalty-points');
-  if (!pointsTag) {
-    pointsTag = document.createElement('span');
-    pointsTag.id = 'loyalty-points';
-    pointsTag.className = 'text-blue-500 ml-2';
+  let pointsElement = document.getElementById(ELEMENT_ID.LOYALTY_POINTS);
+
+  if (!pointsElement) {
+    pointsElement = createElement('span', {
+      id: ELEMENT_ID.LOYALTY_POINTS,
+      className: 'text-blue-500 ml-2',
+      textContent: pointsText,
+    });
+
     document
       .getElementById(ELEMENT_ID.CART_TOTAL_SUMMARY)
-      .appendChild(pointsTag);
+      .appendChild(pointsElement);
+  } else {
+    pointsElement.textContent = pointsText;
   }
-  pointsTag.textContent = '(포인트: ' + points + ')';
 };
 
 const calculateItemDiscountRate = (productId, quantity) => {
@@ -51,8 +58,53 @@ const updateStockStatus = () => {
     stockStatusMessage;
 };
 
+const calculateDiscounts = (
+  totalQuantity,
+  totalAmountWithoutDiscount,
+  calculatedTotalAmount
+) => {
+  // 상품별 할인
+  const itemBasedDiscountAmount =
+    totalAmountWithoutDiscount - calculatedTotalAmount;
+
+  let discountRate = itemBasedDiscountAmount / totalAmountWithoutDiscount || 0;
+
+  // 대량 구매 할인
+  if (totalQuantity >= MIN_QUANTITY_FOR_BULK_DISCOUNT) {
+    const bulkDiscountAmount = totalAmountWithoutDiscount * BULK_DISCOUNT_RATE;
+    if (bulkDiscountAmount > itemBasedDiscountAmount) {
+      calculatedTotalAmount =
+        totalAmountWithoutDiscount * (1 - BULK_DISCOUNT_RATE);
+      discountRate = BULK_DISCOUNT_RATE;
+    }
+  }
+
+  // 화요일 할인
+  if (new Date().getDay() === DAYS_OF_WEEK.TUESDAY) {
+    calculatedTotalAmount *= 1 - TUESDAY_DISCOUNT_RATE;
+    discountRate = Math.max(discountRate, TUESDAY_DISCOUNT_RATE);
+  }
+
+  return {
+    finalTotalAmount: calculatedTotalAmount,
+    discountRate,
+  };
+};
+
+const renderDiscount = (discountRate) => {
+  const discountElement = createElement('span', {
+    className: 'text-green-500 ml-2',
+    textContent: '(' + (discountRate * 100).toFixed(1) + '% 할인 적용)',
+  });
+
+  document
+    .getElementById(ELEMENT_ID.CART_TOTAL_SUMMARY)
+    .appendChild(discountElement);
+};
+
 export const updateCartTotals = () => {
   const cartItems = document.getElementById(ELEMENT_ID.CART).children;
+
   let totalQuantity = 0;
   let totalAmountWithoutDiscount = 0;
   let calculatedTotalAmount = 0;
@@ -72,39 +124,24 @@ export const updateCartTotals = () => {
       itemInfo.id,
       itemQuantity
     );
+
     calculatedTotalAmount += itemTotalAmount * (1 - itemDiscountRate);
   }
 
-  const itemBasedDiscountAmount =
-    totalAmountWithoutDiscount - calculatedTotalAmount;
-  let discountRate = itemBasedDiscountAmount / totalAmountWithoutDiscount;
-  if (totalQuantity >= MIN_QUANTITY_FOR_BULK_DISCOUNT) {
-    const additionalBulkDiscountAmount =
-      calculatedTotalAmount * BULK_DISCOUNT_RATE;
-
-    if (additionalBulkDiscountAmount > itemBasedDiscountAmount) {
-      calculatedTotalAmount =
-        totalAmountWithoutDiscount * (1 - BULK_DISCOUNT_RATE);
-      discountRate = BULK_DISCOUNT_RATE;
-    }
-  }
-
-  if (new Date().getDay() === DAYS_OF_WEEK.TUESDAY) {
-    calculatedTotalAmount *= 1 - TUESDAY_DISCOUNT_RATE;
-    discountRate = Math.max(discountRate, TUESDAY_DISCOUNT_RATE);
-  }
+  const { finalTotalAmount, discountRate } = calculateDiscounts(
+    totalQuantity,
+    totalAmountWithoutDiscount,
+    calculatedTotalAmount
+  );
 
   document.getElementById(ELEMENT_ID.CART_TOTAL_SUMMARY).textContent =
-    '총액: ' + Math.round(calculatedTotalAmount) + '원';
+    '총액: ' + Math.round(finalTotalAmount) + '원';
 
   if (discountRate > 0) {
-    const span = document.createElement('span');
-    span.className = 'text-green-500 ml-2';
-    span.textContent = '(' + (discountRate * 100).toFixed(1) + '% 할인 적용)';
-    document.getElementById(ELEMENT_ID.CART_TOTAL_SUMMARY).appendChild(span);
+    renderDiscount(discountRate);
   }
 
-  dispatch('updateTotalAmount', calculatedTotalAmount);
+  dispatch('updateTotalAmount', finalTotalAmount);
   updateStockStatus();
   renderPoints();
 };
